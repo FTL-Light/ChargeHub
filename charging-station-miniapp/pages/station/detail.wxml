@@ -1,0 +1,86 @@
+<view class="container" wx:if="{{!loading}}">
+  <!-- 站点信息卡片 -->
+  <view class="station-header">
+    <image
+      class="station-cover"
+      src="{{station.image || station.imageUrl || '/images/station-default.png'}}"
+      mode="aspectFill"
+    ></image>
+    <view class="station-base">
+      <view class="station-name">{{station.name}}</view>
+      <view class="station-status-row">
+        <text class="status-tag {{station.status === 1 || station.status === '正常' ? 'online' : 'offline'}}">
+          {{station.status === 1 || station.status === '正常' ? '营业中' : '休息中'}}
+        </text>
+        <text class="open-time">营业时间：{{station.businessHours || station.openHours || '24小时'}}</text>
+      </view>
+      <view class="station-addr">📍 {{station.address || '暂无地址'}}</view>
+      <view class="station-phone" wx:if="{{station.phone || station.contactPhone}}">📞 {{station.phone || station.contactPhone}}</view>
+    </view>
+  </view>
+
+  <!-- 充电桩列表 -->
+  <view class="chargers-section">
+    <view class="section-title">
+      <text class="title-text">充电桩列表</text>
+      <text class="title-count">共{{chargers.length}}个</text>
+    </view>
+
+    <view class="charger-list" wx:if="{{chargers.length > 0}}">
+      <view
+        class="charger-item"
+        wx:for="{{chargers}}"
+        wx:key="id"
+        data-charger="{{item}}"
+        bindtap="onChargerTap"
+      >
+        <view class="charger-left">
+          <view class="charger-icon">⚡</view>
+          <view class="charger-info">
+            <view class="charger-no">编号：{{item.code || item.chargerNo || item.id}}</view>
+            <view class="charger-type">{{item.type || item.chargerType || '未知类型'}}</view>
+            <view class="charger-meta">
+              <text class="meta-power">{{item.power || item.powerRate || '-'}}kW</text>
+              <text class="meta-price">¥{{item.price || item.unitPrice || '0.00'}}/度</text>
+            </view>
+          </view>
+        </view>
+        <view class="charger-right">
+          <view class="charger-status status-{{item.status}}">
+            {{item.status === 0 || item.status === '空闲' ? '空闲' : item.status === 1 || item.status === '使用中' ? '使用中' : item.status === 2 || item.status === '故障' ? '故障' : '离线'}}
+          </view>
+          <view
+            class="charge-btn {{(item.status === 0 || item.status === '空闲') ? '' : 'disabled'}}"
+            catchtap="onChargerTap"
+            data-charger="{{item}}"
+          >
+            充电
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty" wx:else>
+      <text>暂无充电桩</text>
+    </view>
+  </view>
+
+  <view class="bottom-placeholder"></view>
+
+  <!-- 底部导航按钮 -->
+  <view class="bottom-bar">
+    <view class="bottom-btn call-btn" bindtap="onCallTap">
+      <text class="btn-icon">📞</text>
+      <text>电话</text>
+    </view>
+    <view class="bottom-btn nav-btn" bindtap="onNavigateTap">
+      <text class="btn-icon">🧭</text>
+      <text>导航到这里</text>
+    </view>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

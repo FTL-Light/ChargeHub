@@ -1,0 +1,78 @@
+<view class="container" wx:if="{{!loading}}">
+  <!-- 充电桩信息卡片 -->
+  <view class="charger-card">
+    <view class="charger-header">
+      <view class="charger-icon">⚡</view>
+      <view class="charger-base">
+        <view class="charger-name">{{chargerInfo.name || chargerInfo.stationName || '充电桩'}}</view>
+        <view class="charger-no">编号：{{chargerInfo.code || chargerInfo.chargerNo || chargerInfo.id}}</view>
+      </view>
+    </view>
+    <view class="charger-attrs">
+      <view class="attr-item">
+        <text class="attr-label">类型</text>
+        <text class="attr-value">{{chargerInfo.type || chargerInfo.chargerType || '未知'}}</text>
+      </view>
+      <view class="attr-item">
+        <text class="attr-label">功率</text>
+        <text class="attr-value">{{chargerInfo.power || chargerInfo.powerRate || '-'}}kW</text>
+      </view>
+      <view class="attr-item">
+        <text class="attr-label">单价</text>
+        <text class="attr-value price">¥{{chargerInfo.price || chargerInfo.unitPrice || '0.00'}}/度</text>
+      </view>
+      <view class="attr-item">
+        <text class="attr-label">状态</text>
+        <text class="attr-value status-{{chargerInfo.status}}">
+          {{chargerInfo.status === 0 || chargerInfo.status === '空闲' ? '空闲' : chargerInfo.status === 1 || chargerInfo.status === '使用中' ? '使用中' : chargerInfo.status === 2 || chargerInfo.status === '故障' ? '故障' : '离线'}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 充电中状态 -->
+  <view class="charging-status" wx:if="{{isCharging}}">
+    <view class="charging-animate">
+      <view class="charging-circle">
+        <view class="charging-bolt">⚡</view>
+      </view>
+      <view class="charging-pulse"></view>
+    </view>
+    <view class="charging-title">充电中</view>
+    <view class="charging-time">{{chargingTimeText}}</view>
+
+    <view class="charging-data">
+      <view class="data-item">
+        <view class="data-value">{{electricity}}</view>
+        <view class="data-label">充电量(kWh)</view>
+      </view>
+      <view class="data-divider"></view>
+      <view class="data-item">
+        <view class="data-value amount">¥{{amount}}</view>
+        <view class="data-label">预估金额(元)</view>
+      </view>
+    </view>
+
+    <view class="stop-btn" bindtap="stopCharging">
+      <text>停止充电</text>
+    </view>
+  </view>
+
+  <!-- 未充电状态 -->
+  <view class="idle-status" wx:else>
+    <view class="idle-icon">🔌</view>
+    <view class="idle-text">设备就绪</view>
+    <view class="idle-desc">请确认充电桩状态为空闲后开始充电</view>
+    <view
+      class="start-btn {{(chargerInfo.status === 0 || chargerInfo.status === '空闲') ? '' : 'disabled'}}"
+      bindtap="startCharging"
+    >
+      <text>开始充电</text>
+    </view>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

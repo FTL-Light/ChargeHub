@@ -1,0 +1,40 @@
+<view class="container" wx:if="{{!loading}}">
+  <view class="notice-card">
+    <!-- 标题 -->
+    <view class="notice-title">{{notice.title}}</view>
+
+    <!-- 元信息 -->
+    <view class="notice-meta">
+      <text class="notice-type type-{{notice.type}}">
+        {{notice.type === 'system' ? '系统' : notice.type === 'activity' ? '活动' : notice.type === 'notice' ? '公告' : notice.type || '公告'}}
+      </text>
+      <text class="notice-time">{{notice.createTime || notice.publishTime || notice.time}}</text>
+    </view>
+
+    <!-- 来源 -->
+    <view class="notice-source" wx:if="{{notice.source}}">
+      来源：{{notice.source}}
+    </view>
+
+    <!-- 分割线 -->
+    <view class="divider"></view>
+
+    <!-- 内容 -->
+    <view class="notice-content">
+      <text>{{notice.content}}</text>
+    </view>
+
+    <!-- 图片 -->
+    <image
+      wx:if="{{notice.image || notice.imageUrl}}"
+      class="notice-image"
+      src="{{notice.image || notice.imageUrl}}"
+      mode="widthFix"
+    ></image>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading" wx:if="{{loading}}">
+  <text>加载中...</text>
+</view>

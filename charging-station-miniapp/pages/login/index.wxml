@@ -1,0 +1,168 @@
+<view class="container">
+  <!-- Logo 区域 -->
+  <view class="logo-section">
+    <view class="logo-icon">⚡</view>
+    <view class="logo-title">新能源充电站</view>
+    <view class="logo-desc">便捷充电 · 绿色出行</view>
+  </view>
+
+  <!-- 注册表单 -->
+  <block wx:if="{{isRegister}}">
+    <view class="form-section">
+      <view class="form-title">注册账号</view>
+      <view class="form-item">
+        <view class="input-wrap">
+          <text class="input-icon">📱</text>
+          <input
+            class="form-input"
+            type="number"
+            placeholder="请输入手机号"
+            value="{{registerForm.phone}}"
+            data-field="phone"
+            bindinput="onRegisterInput"
+            maxlength="11"
+          />
+        </view>
+      </view>
+      <view class="form-item">
+        <view class="input-wrap">
+          <text class="input-icon">👤</text>
+          <input
+            class="form-input"
+            type="text"
+            placeholder="请输入昵称（选填）"
+            value="{{registerForm.nickname}}"
+            data-field="nickname"
+            bindinput="onRegisterInput"
+            maxlength="20"
+          />
+        </view>
+      </view>
+      <view class="form-item">
+        <view class="input-wrap">
+          <text class="input-icon">🔒</text>
+          <input
+            class="form-input"
+            type="password"
+            placeholder="请输入密码（至少6位）"
+            value="{{registerForm.password}}"
+            data-field="password"
+            bindinput="onRegisterInput"
+            maxlength="20"
+          />
+        </view>
+      </view>
+      <view class="form-item">
+        <view class="input-wrap">
+          <text class="input-icon">🔒</text>
+          <input
+            class="form-input"
+            type="password"
+            placeholder="请确认密码"
+            value="{{registerForm.confirmPassword}}"
+            data-field="confirmPassword"
+            bindinput="onRegisterInput"
+            maxlength="20"
+          />
+        </view>
+      </view>
+
+      <view
+        class="primary-btn {{submitting ? 'disabled' : ''}}"
+        bindtap="onRegister"
+      >
+        {{submitting ? '注册中...' : '立即注册'}}
+      </view>
+
+      <view class="switch-text">
+        已有账号？
+        <text class="switch-link" bindtap="toggleRegister">立即登录</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 登录表单 -->
+  <block wx:else>
+    <!-- 切换登录方式 -->
+    <view class="tab-section">
+      <view
+        class="tab-item {{loginType === 'wechat' ? 'active' : ''}}"
+        data-type="wechat"
+        bindtap="switchTab"
+      >
+        微信登录
+      </view>
+      <view
+        class="tab-item {{loginType === 'phone' ? 'active' : ''}}"
+        data-type="phone"
+        bindtap="switchTab"
+      >
+        手机号登录
+      </view>
+    </view>
+
+    <!-- 微信登录 -->
+    <view class="wechat-section" wx:if="{{loginType === 'wechat'}}">
+      <view class="wechat-icon">💚</view>
+      <view class="wechat-text">使用微信快速登录</view>
+      <view class="wechat-desc">授权后即可使用全部功能</view>
+
+      <view
+        class="primary-btn wechat-btn {{submitting ? 'disabled' : ''}}"
+        bindtap="onWechatLogin"
+      >
+        {{submitting ? '登录中...' : '微信一键登录'}}
+      </view>
+    </view>
+
+    <!-- 手机号登录 -->
+    <view class="phone-section" wx:else>
+      <view class="form-item">
+        <view class="input-wrap">
+          <text class="input-icon">📱</text>
+          <input
+            class="form-input"
+            type="number"
+            placeholder="请输入手机号"
+            value="{{phoneForm.phone}}"
+            bindinput="onPhoneInput"
+            maxlength="11"
+          />
+        </view>
+      </view>
+      <view class="form-item">
+        <view class="input-wrap">
+          <text class="input-icon">🔒</text>
+          <input
+            class="form-input"
+            type="password"
+            placeholder="请输入密码"
+            value="{{phoneForm.password}}"
+            bindinput="onPasswordInput"
+            maxlength="20"
+          />
+        </view>
+      </view>
+
+      <view
+        class="primary-btn {{submitting ? 'disabled' : ''}}"
+        bindtap="onPhoneLogin"
+      >
+        {{submitting ? '登录中...' : '立即登录'}}
+      </view>
+    </view>
+
+    <view class="switch-text">
+      还没有账号？
+      <text class="switch-link" bindtap="toggleRegister">立即注册</text>
+    </view>
+  </block>
+
+  <!-- 协议 -->
+  <view class="agreement">
+    登录即代表您同意
+    <text class="agreement-link">《用户协议》</text>
+    和
+    <text class="agreement-link">《隐私政策》</text>
+  </view>
+</view>

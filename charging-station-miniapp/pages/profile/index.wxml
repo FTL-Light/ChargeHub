@@ -1,0 +1,55 @@
+<view class="container">
+  <!-- 用户信息卡片 -->
+  <view class="user-header">
+    <block wx:if="{{isLoggedIn}}">
+      <view class="user-info">
+        <view class="avatar">{{userInfo.nickname ? userInfo.nickname.charAt(0) : 'U'}}</view>
+        <view class="user-detail">
+          <view class="nickname">{{userInfo.nickname || userInfo.username || '用户'}}</view>
+          <view class="phone" wx:if="{{userInfo.phone}}">📞 {{userInfo.phone}}</view>
+        </view>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="user-info" bindtap="onLoginTap">
+        <view class="avatar default-avatar">👤</view>
+        <view class="user-detail">
+          <view class="nickname">点击登录</view>
+          <view class="phone">登录后享受更多服务</view>
+        </view>
+        <view class="login-arrow">›</view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 余额卡片 -->
+  <view class="balance-card">
+    <view class="balance-info">
+      <view class="balance-label">账户余额（元）</view>
+      <view class="balance-value">{{balance}}</view>
+    </view>
+    <view class="recharge-btn" bindtap="onRechargeTap">
+      <text>充值</text>
+    </view>
+  </view>
+
+  <!-- 功能菜单 -->
+  <view class="menu-card">
+    <view
+      class="menu-item"
+      wx:for="{{menuList}}"
+      wx:key="id"
+      data-menu="{{item}}"
+      bindtap="onMenuTap"
+    >
+      <view class="menu-icon">{{item.icon}}</view>
+      <view class="menu-name">{{item.name}}</view>
+      <view class="menu-arrow">›</view>
+    </view>
+  </view>
+
+  <!-- 退出登录 -->
+  <view class="logout-btn" wx:if="{{isLoggedIn}}" bindtap="onLogoutTap">
+    <text>退出登录</text>
+  </view>
+</view>

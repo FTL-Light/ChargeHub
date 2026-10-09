@@ -1,0 +1,271 @@
+.container {
+  padding: 30rpx;
+}
+
+/* 充电桩信息卡片 */
+.charger-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.charger-header {
+  display: flex;
+  align-items: center;
+  padding-bottom: 24rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.charger-icon {
+  width: 80rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%);
+  border-radius: 16rpx;
+  font-size: 40rpx;
+  color: #ffffff;
+  margin-right: 20rpx;
+}
+
+.charger-base {
+  flex: 1;
+}
+
+.charger-name {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.charger-no {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.charger-attrs {
+  display: flex;
+  flex-wrap: wrap;
+  padding-top: 24rpx;
+}
+
+.attr-item {
+  width: 50%;
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+}
+
+.attr-label {
+  font-size: 26rpx;
+  color: #999;
+  width: 100rpx;
+}
+
+.attr-value {
+  font-size: 26rpx;
+  color: #333;
+  flex: 1;
+}
+
+.attr-value.price {
+  color: #ff6b00;
+}
+
+.attr-value.status-0, .attr-value.status-空闲 {
+  color: #52c41a;
+}
+
+.attr-value.status-1, .attr-value.status-使用中 {
+  color: #faad14;
+}
+
+.attr-value.status-2, .attr-value.status-故障, .attr-value.status-3, .attr-value.status-离线 {
+  color: #999;
+}
+
+/* 充电中状态 */
+.charging-status {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 60rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.charging-animate {
+  position: relative;
+  width: 200rpx;
+  height: 200rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 30rpx;
+}
+
+.charging-circle {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  animation: circlePulse 1.5s ease-in-out infinite;
+}
+
+.charging-bolt {
+  font-size: 80rpx;
+  color: #ffffff;
+}
+
+.charging-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160rpx;
+  height: 160rpx;
+  margin-top: -80rpx;
+  margin-left: -80rpx;
+  border-radius: 50%;
+  background: #1890ff;
+  opacity: 0.3;
+  animation: pulse 1.5s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes circlePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.charging-title {
+  font-size: 32rpx;
+  color: #1890ff;
+  font-weight: bold;
+  margin-bottom: 16rpx;
+}
+
+.charging-time {
+  font-size: 80rpx;
+  font-weight: bold;
+  color: #333;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 40rpx;
+  letter-spacing: 4rpx;
+}
+
+.charging-data {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 30rpx 0;
+  border-top: 1rpx solid #f0f0f0;
+  border-bottom: 1rpx solid #f0f0f0;
+  margin-bottom: 40rpx;
+}
+
+.data-item {
+  flex: 1;
+  text-align: center;
+}
+
+.data-value {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.data-value.amount {
+  color: #ff6b00;
+}
+
+.data-label {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.data-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background: #f0f0f0;
+}
+
+.stop-btn {
+  width: 80%;
+  height: 90rpx;
+  line-height: 90rpx;
+  text-align: center;
+  background: #ff4d4f;
+  color: #ffffff;
+  font-size: 32rpx;
+  border-radius: 45rpx;
+  box-shadow: 0 8rpx 20rpx rgba(255, 77, 79, 0.3);
+}
+
+/* 未充电状态 */
+.idle-status {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 80rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.idle-icon {
+  font-size: 120rpx;
+  margin-bottom: 30rpx;
+}
+
+.idle-text {
+  font-size: 34rpx;
+  color: #333;
+  font-weight: bold;
+  margin-bottom: 16rpx;
+}
+
+.idle-desc {
+  font-size: 26rpx;
+  color: #999;
+  margin-bottom: 60rpx;
+}
+
+.start-btn {
+  width: 80%;
+  height: 90rpx;
+  line-height: 90rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  border-radius: 45rpx;
+  box-shadow: 0 8rpx 24rpx rgba(24, 144, 255, 0.3);
+}
+
+.start-btn.disabled {
+  background: #d9d9d9;
+  color: #999;
+  box-shadow: none;
+}
+
+.loading {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}

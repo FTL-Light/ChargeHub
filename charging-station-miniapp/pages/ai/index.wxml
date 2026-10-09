@@ -1,0 +1,77 @@
+<view class="container">
+  <!-- 聊天区域 -->
+  <scroll-view
+    class="chat-area"
+    scroll-y="true"
+    scroll-into-view="{{scrollToView}}"
+    scroll-with-animation="true"
+    enhanced="true"
+    show-scrollbar="{{false}}"
+  >
+    <view class="msg-list">
+      <view
+        class="msg-item {{item.role === 'user' ? 'msg-user' : 'msg-assistant'}}"
+        wx:for="{{messages}}"
+        wx:key="id"
+        id="{{item.id}}"
+      >
+        <view class="avatar" wx:if="{{item.role === 'assistant'}}">🤖</view>
+        <view class="msg-bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-assistant'}}">
+          <text class="msg-content">{{item.content}}</text>
+        </view>
+        <view class="avatar" wx:if="{{item.role === 'user'}}">👤</view>
+      </view>
+
+      <!-- 加载中 -->
+      <view class="msg-item msg-assistant" wx:if="{{isLoading}}">
+        <view class="avatar">🤖</view>
+        <view class="msg-bubble bubble-assistant loading-bubble">
+          <view class="loading-dots">
+            <view class="dot"></view>
+            <view class="dot"></view>
+            <view class="dot"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 快捷问题 -->
+      <view class="quick-questions" wx:if="{{messages.length <= 2 && !isLoading}}">
+        <view class="quick-title">您可能想问：</view>
+        <view class="quick-list">
+          <view
+            class="quick-item"
+            wx:for="{{quickQuestions}}"
+            wx:key="*this"
+            wx:for-item="q"
+            data-question="{{q}}"
+            bindtap="onQuickQuestion"
+          >
+            {{q}}
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-placeholder"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部输入区域 -->
+  <view class="input-area">
+    <input
+      class="msg-input"
+      type="text"
+      placeholder="请输入您的问题"
+      value="{{inputMessage}}"
+      bindinput="onInput"
+      confirm-type="send"
+      bindconfirm="sendMessage"
+      adjust-position="{{true}}"
+    />
+    <view
+      class="send-btn {{(!inputMessage || isLoading) ? 'disabled' : ''}}"
+      bindtap="sendMessage"
+    >
+      发送
+    </view>
+  </view>
+</view>
