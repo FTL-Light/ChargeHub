@@ -240,3 +240,7 @@ npm run build
 2. 微信开发者工具点击「上传」
 3. 微信公众平台提交审核
 4. 审核通过后发布
+
+## License
+
+本项目基于 [MIT License](LICENSE) 开源，Copyright (c) 2026 FTL-Light。
