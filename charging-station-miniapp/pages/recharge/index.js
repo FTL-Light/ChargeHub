@@ -8,7 +8,9 @@ Page({
     quickAmounts: [50, 100, 200, 500],
     rechargeList: [],
     loading: false,
-    submitting: false
+    submitting: false,
+    // 幂等请求号：失败重试时复用，防止后端重复加余额
+    requestNo: ''
   },
 
   onLoad() {
@@ -89,10 +91,16 @@ Page({
     }
     this.setData({ submitting: true })
     wx.showLoading({ title: '充值中' })
-    recharge({ amount: amount })
+    // 首次提交时生成请求号，重试时复用同一请求号(后端幂等去重)
+    if (!this.data.requestNo) {
+      this.setData({
+        requestNo: 'R' + Date.now() + Math.floor(Math.random() * 100000)
+      })
+    }
+    recharge({ amount: amount, requestNo: this.data.requestNo })
       .then((res) => {
         wx.hideLoading()
-        this.setData({ submitting: false })
+        this.setData({ submitting: false, requestNo: '' })
         wx.showToast({ title: '充值成功', icon: 'success' })
         // 刷新余额和记录
         this.setData({

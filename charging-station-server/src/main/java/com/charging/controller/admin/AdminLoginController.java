@@ -10,6 +10,7 @@ import com.charging.entity.LoginLog;
 import com.charging.service.AdminService;
 import com.charging.service.LoginLogService;
 import com.charging.utils.JwtUtil;
+import com.charging.utils.LoginAttemptLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +40,7 @@ public class AdminLoginController {
     private final AdminService adminService;
     private final LoginLogService loginLogService;
     private final JwtUtil jwtUtil;
+    private final LoginAttemptLimiter loginAttemptLimiter;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @PostMapping("/login")
@@ -49,11 +51,14 @@ public class AdminLoginController {
                 .eq(Admin::getUsername, dto.getUsername())
                 .one();
 
+        String clientIp = getClientIp(request);
+        String limiterKey = dto.getUsername() + "@" + clientIp;
+
         // 记录登录日志
         LoginLog loginLog = new LoginLog();
         loginLog.setUserType(1);
         loginLog.setUsername(dto.getUsername());
-        loginLog.setLoginIp(getClientIp(request));
+        loginLog.setLoginIp(clientIp);
         loginLog.setLoginTime(LocalDateTime.now());
 
         // 解析浏览器和操作系统
@@ -66,7 +71,16 @@ public class AdminLoginController {
         // 根据IP获取登录地点(简化处理)
         loginLog.setLoginLocation("未知");
 
+        // 登录失败限流检查(防暴力破解)，锁定期间同样记录日志
+        if (loginAttemptLimiter.isBlocked(limiterKey)) {
+            loginLog.setStatus(0);
+            loginLog.setMsg("失败次数过多，临时锁定");
+            loginLogService.save(loginLog);
+            throw new BusinessException("登录失败次数过多，请15分钟后再试");
+        }
+
         if (admin == null) {
+            loginAttemptLimiter.recordFailure(limiterKey);
             loginLog.setStatus(0);
             loginLog.setMsg("用户不存在");
             loginLogService.save(loginLog);
@@ -75,6 +89,7 @@ public class AdminLoginController {
 
         // 验证密码 (BCrypt)
         if (!passwordEncoder.matches(dto.getPassword(), admin.getPassword())) {
+            loginAttemptLimiter.recordFailure(limiterKey);
             loginLog.setUserId(admin.getId());
             loginLog.setStatus(0);
             loginLog.setMsg("密码错误");
@@ -91,7 +106,8 @@ public class AdminLoginController {
             throw new BusinessException("账号已被禁用，请联系超级管理员");
         }
 
-        // 生成 token
+        // 生成 token (登录成功，清除该账号的失败计数)
+        loginAttemptLimiter.clear(limiterKey);
         String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), 1);
 
         // 记录登录成功日志

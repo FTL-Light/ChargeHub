@@ -1,5 +1,6 @@
 package com.charging.config;
 
+import com.charging.interceptor.AdminAuthInterceptor;
 import com.charging.interceptor.JwtInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -36,5 +37,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/static/**",
                         "/error"
                 );
+
+        // 管理端接口二次校验角色(userType=1)，防止普通用户越权访问
+        registry.addInterceptor(new AdminAuthInterceptor())
+                .addPathPatterns("/admin/**")
+                .excludePathPatterns("/admin/login");
     }
 }

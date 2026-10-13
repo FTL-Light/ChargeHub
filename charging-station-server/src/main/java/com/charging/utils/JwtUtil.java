@@ -3,6 +3,7 @@ package com.charging.utils;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,19 @@ public class JwtUtil {
 
     @Value("${jwt.expiration}")
     private Long expiration;
+
+    /**
+     * 启动时校验密钥强度：未配置或长度不足直接失败(fail-fast)，避免使用弱密钥签发 token
+     */
+    @PostConstruct
+    public void checkSecret() {
+        if (secret == null || secret.isBlank()
+                || secret.getBytes(StandardCharsets.UTF_8).length < 32
+                || secret.contains("your-jwt-secret")) {
+            throw new IllegalStateException(
+                    "JWT 密钥未配置或强度不足(至少32字节)，请通过环境变量 JWT_SECRET 或 application-dev.yml 的 jwt.secret 配置");
+        }
+    }
 
     /**
      * 获取签名密钥

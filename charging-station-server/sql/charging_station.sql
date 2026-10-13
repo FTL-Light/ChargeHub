@@ -153,10 +153,12 @@ CREATE TABLE `t_recharge_record` (
   `user_id` bigint NOT NULL COMMENT '用户ID',
   `amount` decimal(10,2) NOT NULL COMMENT '充值金额',
   `pay_type` int DEFAULT '1' COMMENT '支付方式: 1-微信',
+  `request_no` varchar(64) DEFAULT NULL COMMENT '幂等请求号(同一请求号只充值一次)',
   `status` int DEFAULT '1' COMMENT '状态: 0-失败, 1-成功',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `deleted` int DEFAULT '0' COMMENT '逻辑删除: 0-未删除, 1-已删除',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_request_no` (`request_no`),
   KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='充值记录表';
 

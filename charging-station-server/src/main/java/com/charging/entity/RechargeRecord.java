@@ -30,6 +30,11 @@ public class RechargeRecord {
     private Integer payType;
 
     /**
+     * 幂等请求号(前端生成，同一请求号只充值一次)
+     */
+    private String requestNo;
+
+    /**
      * 状态: 0-失败, 1-成功
      */
     private Integer status;

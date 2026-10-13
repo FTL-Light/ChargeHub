@@ -47,6 +47,18 @@ public class MiniOrderController {
     public R<Order> start(@Valid @RequestBody StartChargingDTO dto, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
 
+        // 锁定用户行，串行化同一用户的并发下单，并校验账号状态
+        User user = userService.lambdaQuery()
+                .eq(User::getId, userId)
+                .last("FOR UPDATE")
+                .one();
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new BusinessException("账号已被禁用，无法充电");
+        }
+
         // 校验充电桩
         Charger charger = chargerService.getById(dto.getChargerId());
         if (charger == null) {
@@ -80,6 +92,26 @@ public class MiniOrderController {
             throw new BusinessException("您有正在进行的充电订单，请先结束");
         }
 
+        // CAS 锁定充电枪(仅当仍为空闲时更新成功)，防止并发抢占同一把枪
+        boolean gunLocked = gunService.lambdaUpdate()
+                .eq(Gun::getId, gun.getId())
+                .eq(Gun::getStatus, 1)
+                .set(Gun::getStatus, 2)
+                .update();
+        if (!gunLocked) {
+            throw new BusinessException("充电枪已被占用，请选择其他充电枪");
+        }
+
+        // CAS 锁定充电桩，失败则抛异常回滚(释放上面锁定的枪)
+        boolean chargerLocked = chargerService.lambdaUpdate()
+                .eq(Charger::getId, charger.getId())
+                .eq(Charger::getStatus, 1)
+                .set(Charger::getStatus, 2)
+                .update();
+        if (!chargerLocked) {
+            throw new BusinessException("充电桩已被占用，请选择其他充电桩");
+        }
+
         // 生成订单编号: ORD + 时间戳 + 4位随机数
         String orderNo = "ORD" + System.currentTimeMillis() + RandomUtil.randomNumbers(4);
 
@@ -96,17 +128,6 @@ public class MiniOrderController {
         order.setStatus(1); // 充电中
         orderService.save(order);
 
-        // 更新充电桩和枪状态为 2(充电中)
-        Charger chargerUpdate = new Charger();
-        chargerUpdate.setId(charger.getId());
-        chargerUpdate.setStatus(2);
-        chargerService.updateById(chargerUpdate);
-
-        Gun gunUpdate = new Gun();
-        gunUpdate.setId(gun.getId());
-        gunUpdate.setStatus(2);
-        gunService.updateById(gunUpdate);
-
         return R.ok("开始充电", order);
     }
 
@@ -116,7 +137,11 @@ public class MiniOrderController {
     public R<Order> stop(@Valid @RequestBody StopChargingDTO dto, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
 
-        Order order = orderService.getById(dto.getOrderId());
+        // 行锁读取订单，串行化同一订单的并发结算，防止重复扣款
+        Order order = orderService.lambdaQuery()
+                .eq(Order::getId, dto.getOrderId())
+                .last("FOR UPDATE")
+                .one();
         if (order == null) {
             throw new BusinessException("订单不存在");
         }
@@ -158,13 +183,11 @@ public class MiniOrderController {
         order.setPayType(payType);
 
         if (payType != null && payType == 1) {
-            // 余额支付: 扣除余额
-            User user = userService.getById(userId);
-            if (user.getBalance() == null || user.getBalance().compareTo(totalAmount) < 0) {
+            // 原子扣减余额(数据库层面扣减)，余额不足则失败并回滚整个事务
+            boolean deducted = userService.deductBalance(userId, totalAmount);
+            if (!deducted) {
                 throw new BusinessException("余额不足，请充值或选择其他支付方式");
             }
-            user.setBalance(user.getBalance().subtract(totalAmount));
-            userService.updateById(user);
             order.setStatus(3); // 已完成
         } else {
             order.setStatus(2); // 待支付

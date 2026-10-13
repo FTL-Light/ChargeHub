@@ -33,7 +33,7 @@ public class MiniFeedbackController {
         feedback.setUserId(userId);
         feedback.setStatus(0); // 待处理
         feedbackService.save(feedback);
-        return R.ok("提交成功");
+        return R.ok("提交成功", null);
     }
 
     @GetMapping("/list")

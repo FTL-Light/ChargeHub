@@ -1,10 +1,12 @@
 package com.charging.controller.miniapp;
 
 import cn.hutool.core.util.IdUtil;
+import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.dto.AiChatDTO;
 import com.charging.entity.AiChatLog;
 import com.charging.service.AiChatLogService;
+import com.charging.utils.AiRateLimiter;
 import com.charging.utils.AiUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -32,11 +34,17 @@ public class MiniAiController {
 
     private final AiUtil aiUtil;
     private final AiChatLogService aiChatLogService;
+    private final AiRateLimiter aiRateLimiter;
 
     @PostMapping("/chat")
     @Operation(summary = "AI对话")
     public R<Map<String, Object>> chat(@Valid @RequestBody AiChatDTO dto, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+
+        // 每日调用次数限制，防止接口被刷产生高额 token 费用
+        if (!aiRateLimiter.tryAcquire(userId)) {
+            throw new BusinessException("今日AI咨询次数已达上限，请明天再来");
+        }
 
         // 生成或使用已有会话ID
         String sessionId = dto.getSessionId();

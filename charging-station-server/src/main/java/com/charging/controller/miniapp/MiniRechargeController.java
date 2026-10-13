@@ -5,9 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.entity.RechargeRecord;
-import com.charging.entity.User;
 import com.charging.service.RechargeRecordService;
-import com.charging.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,7 +32,6 @@ import java.math.BigDecimal;
 public class MiniRechargeController {
 
     private final RechargeRecordService rechargeRecordService;
-    private final UserService userService;
 
     @PostMapping
     @Operation(summary = "充值")
@@ -44,26 +41,8 @@ public class MiniRechargeController {
             throw new BusinessException("充值金额必须大于0");
         }
 
-        User user = userService.getById(userId);
-        if (user == null) {
-            throw new BusinessException("用户不存在");
-        }
-
-        // 创建充值记录
-        RechargeRecord record = new RechargeRecord();
-        record.setUserId(userId);
-        record.setAmount(dto.getAmount());
-        record.setPayType(dto.getPayType() != null ? dto.getPayType() : 1);
-        record.setStatus(1); // 成功(模拟支付成功)
-        rechargeRecordService.save(record);
-
-        // 更新用户余额
-        BigDecimal newBalance = (user.getBalance() == null ? BigDecimal.ZERO : user.getBalance()).add(dto.getAmount());
-        User update = new User();
-        update.setId(userId);
-        update.setBalance(newBalance);
-        userService.updateById(update);
-
+        // 事务内完成: 写充值记录 + 原子增加余额，requestNo 保证幂等
+        RechargeRecord record = rechargeRecordService.recharge(userId, dto.getAmount(), dto.getPayType(), dto.getRequestNo());
         return R.ok("充值成功", record);
     }
 
@@ -90,5 +69,10 @@ public class MiniRechargeController {
         private BigDecimal amount;
 
         private Integer payType;
+
+        /**
+         * 幂等请求号(前端生成，同一请求号只充值一次)
+         */
+        private String requestNo;
     }
 }
