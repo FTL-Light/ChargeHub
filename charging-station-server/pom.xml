@@ -52,6 +52,12 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
+        <!-- Spring Data Redis (GEO 附近站点索引) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
