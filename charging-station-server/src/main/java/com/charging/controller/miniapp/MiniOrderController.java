@@ -194,16 +194,25 @@ public class MiniOrderController {
         }
         orderService.updateById(order);
 
-        // 恢复充电桩和枪状态为 1(空闲)
-        Charger chargerUpdate = new Charger();
-        chargerUpdate.setId(order.getChargerId());
-        chargerUpdate.setStatus(1);
-        chargerService.updateById(chargerUpdate);
+        // CAS 恢复充电桩状态: 只有"使用中"才能恢复"空闲"，防止并发重复停止导致状态错乱
+        boolean chargerReleased = chargerService.lambdaUpdate()
+                .eq(Charger::getId, order.getChargerId())
+                .eq(Charger::getStatus, 2)
+                .set(Charger::getStatus, 1)
+                .update();
+        if (!chargerReleased) {
+            throw new BusinessException("充电桩状态异常，停止充电失败");
+        }
 
-        Gun gunUpdate = new Gun();
-        gunUpdate.setId(order.getGunId());
-        gunUpdate.setStatus(1);
-        gunService.updateById(gunUpdate);
+        // CAS 恢复充电枪状态
+        boolean gunReleased = gunService.lambdaUpdate()
+                .eq(Gun::getId, order.getGunId())
+                .eq(Gun::getStatus, 2)
+                .set(Gun::getStatus, 1)
+                .update();
+        if (!gunReleased) {
+            throw new BusinessException("充电枪状态异常，停止充电失败");
+        }
 
         return R.ok("充电结束", order);
     }

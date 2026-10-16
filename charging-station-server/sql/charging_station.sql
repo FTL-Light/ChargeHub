@@ -23,6 +23,7 @@ CREATE TABLE `t_user` (
   `status` int DEFAULT '1' COMMENT '状态: 0-禁用, 1-启用',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `version` int DEFAULT '0' COMMENT '乐观锁版本号',
   `deleted` int DEFAULT '0' COMMENT '逻辑删除: 0-未删除, 1-已删除',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_username` (`username`),
@@ -93,6 +94,7 @@ CREATE TABLE `t_charger` (
   `price` decimal(10,2) DEFAULT NULL COMMENT '单价(元/度)',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `version` int DEFAULT '0' COMMENT '乐观锁版本号',
   `deleted` int DEFAULT '0' COMMENT '逻辑删除: 0-未删除, 1-已删除',
   PRIMARY KEY (`id`),
   KEY `idx_station_id` (`station_id`)
@@ -109,6 +111,7 @@ CREATE TABLE `t_gun` (
   `status` int DEFAULT '1' COMMENT '状态: 0-故障, 1-空闲, 2-使用中',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `version` int DEFAULT '0' COMMENT '乐观锁版本号',
   `deleted` int DEFAULT '0' COMMENT '逻辑删除: 0-未删除, 1-已删除',
   PRIMARY KEY (`id`),
   KEY `idx_charger_id` (`charger_id`)
