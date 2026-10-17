@@ -2,10 +2,12 @@ package com.charging.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.charging.common.CacheKeys;
 import com.charging.entity.Station;
 import com.charging.mapper.StationMapper;
 import com.charging.service.StationGeoService;
 import com.charging.service.StationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.geo.Distance;
@@ -23,6 +25,7 @@ import java.io.Serializable;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,6 +45,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
 
     private final StringRedisTemplate stringRedisTemplate;
     private final StationGeoService stationGeoService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public List<Station> findNearbyStations(Double longitude, Double latitude, Double radiusKm) {
@@ -114,6 +118,35 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     }
 
     @Override
+    public Station getCachedById(Long id) {
+        String key = CacheKeys.stationDetail(id);
+        try {
+            String cached = stringRedisTemplate.opsForValue().get(key);
+            if (CacheKeys.NULL_PLACEHOLDER.equals(cached)) {
+                return null;
+            }
+            if (cached != null) {
+                return objectMapper.readValue(cached, Station.class);
+            }
+        } catch (Exception e) {
+            log.warn("Redis 站点详情缓存读取失败, key={}, 降级直查数据库", key, e);
+        }
+
+        Station station = super.getById(id);
+        try {
+            if (station == null) {
+                stringRedisTemplate.opsForValue().set(key, CacheKeys.NULL_PLACEHOLDER, 60, TimeUnit.SECONDS);
+            } else {
+                long expire = 30 * 60L + (long) (Math.random() * 5 * 60);
+                stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(station), expire, TimeUnit.SECONDS);
+            }
+        } catch (Exception e) {
+            log.warn("Redis 站点详情缓存写入失败, key={}", key, e);
+        }
+        return station;
+    }
+
+    @Override
     public boolean save(Station station) {
         boolean result = super.save(station);
         if (result) {
@@ -126,7 +159,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     public boolean updateById(Station station) {
         boolean result = super.updateById(station);
         if (result && station.getId() != null) {
-            // 入参可能是部分字段，查询最新完整实体后再同步索引
+            stringRedisTemplate.delete(CacheKeys.stationDetail(station.getId()));
             stationGeoService.sync(super.getById(station.getId()));
         }
         return result;
@@ -136,6 +169,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     public boolean removeById(Serializable id) {
         boolean result = super.removeById(id);
         if (result) {
+            stringRedisTemplate.delete(CacheKeys.stationDetail((Long) id));
             stationGeoService.remove(id);
         }
         return result;

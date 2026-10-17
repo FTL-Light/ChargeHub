@@ -1,12 +1,17 @@
 package com.charging.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.charging.common.CacheKeys;
 import com.charging.entity.Order;
 import com.charging.mapper.OrderMapper;
 import com.charging.service.OrderService;
 import com.charging.service.StationService;
 import com.charging.service.UserService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,19 +21,46 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 订单服务实现类
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements OrderService {
 
     private final UserService userService;
     private final StationService stationService;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;
 
     @Override
     public Map<String, Object> getStatistics() {
+        try {
+            String cached = stringRedisTemplate.opsForValue().get(CacheKeys.ORDER_STATS);
+            if (cached != null) {
+                return objectMapper.readValue(cached, new TypeReference<Map<String, Object>>() {});
+            }
+        } catch (Exception e) {
+            log.warn("Redis 订单统计缓存读取失败, 降级直查数据库", e);
+        }
+
+        Map<String, Object> result = doGetStatistics();
+        try {
+            stringRedisTemplate.opsForValue().set(CacheKeys.ORDER_STATS,
+                    objectMapper.writeValueAsString(result), 5, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.warn("Redis 订单统计缓存写入失败", e);
+        }
+        return result;
+    }
+
+    /**
+     * 实际统计计算（聚合查询开销大，上层以 5 分钟缓存兜底）
+     */
+    private Map<String, Object> doGetStatistics() {
         Map<String, Object> result = new HashMap<>();
 
         // 总订单数

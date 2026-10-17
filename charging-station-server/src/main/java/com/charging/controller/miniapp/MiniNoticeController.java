@@ -31,12 +31,7 @@ public class MiniNoticeController {
             @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "类型") @RequestParam(required = false) Integer type) {
-        Page<Notice> page = new Page<>(current, size);
-        LambdaQueryWrapper<Notice> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Notice::getStatus, 1);
-        wrapper.eq(type != null, Notice::getType, type);
-        wrapper.orderByDesc(Notice::getTop).orderByDesc(Notice::getPublishTime);
-        return R.ok(noticeService.page(page, wrapper));
+        return R.ok(noticeService.pageCached(current, size, type));
     }
 
     @GetMapping("/{id}")

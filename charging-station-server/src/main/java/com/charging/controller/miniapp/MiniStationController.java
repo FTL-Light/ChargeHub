@@ -50,7 +50,7 @@ public class MiniStationController {
     @GetMapping("/{id}")
     @Operation(summary = "获取充电站详情")
     public R<Station> detail(@Parameter(description = "站点ID") @PathVariable Long id) {
-        Station station = stationService.getById(id);
+        Station station = stationService.getCachedById(id);
         if (station == null) {
             throw new BusinessException("站点不存在");
         }

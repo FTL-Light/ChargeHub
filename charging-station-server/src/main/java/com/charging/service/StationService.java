@@ -19,4 +19,12 @@ public interface StationService extends IService<Station> {
      * @return 附近站点列表(按距离升序)
      */
     List<Station> findNearbyStations(Double longitude, Double latitude, Double radiusKm);
+
+    /**
+     * 获取充电站详情（带缓存，旁路模式）
+     *
+     * @param id 站点ID
+     * @return 站点详情；不存在返回 null
+     */
+    Station getCachedById(Long id);
 }
