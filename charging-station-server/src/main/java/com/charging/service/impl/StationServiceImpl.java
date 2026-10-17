@@ -3,6 +3,7 @@ package com.charging.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.charging.common.CacheKeys;
+import com.charging.config.StationBloomFilter;
 import com.charging.entity.Station;
 import com.charging.mapper.StationMapper;
 import com.charging.service.StationGeoService;
@@ -45,6 +46,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
 
     private final StringRedisTemplate stringRedisTemplate;
     private final StationGeoService stationGeoService;
+    private final StationBloomFilter stationBloomFilter;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -117,14 +119,19 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
                 .toList();
     }
 
+    /**
+     * 站点详情查询链路：布隆过滤器前置拦截 → Redis 缓存 → 数据库（读时回填）
+     * 布隆过滤器判定 ID 一定不存在时直接返回，恶意请求不再穿透到缓存/DB。
+     */
     @Override
     public Station getCachedById(Long id) {
+        if (!stationBloomFilter.mightContain(id)) {
+            return null;
+        }
+
         String key = CacheKeys.stationDetail(id);
         try {
             String cached = stringRedisTemplate.opsForValue().get(key);
-            if (CacheKeys.NULL_PLACEHOLDER.equals(cached)) {
-                return null;
-            }
             if (cached != null) {
                 return objectMapper.readValue(cached, Station.class);
             }
@@ -134,9 +141,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
 
         Station station = super.getById(id);
         try {
-            if (station == null) {
-                stringRedisTemplate.opsForValue().set(key, CacheKeys.NULL_PLACEHOLDER, 60, TimeUnit.SECONDS);
-            } else {
+            if (station != null) {
                 long expire = 30 * 60L + (long) (Math.random() * 5 * 60);
                 stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(station), expire, TimeUnit.SECONDS);
             }
@@ -150,6 +155,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     public boolean save(Station station) {
         boolean result = super.save(station);
         if (result) {
+            stationBloomFilter.add(station.getId());
             stationGeoService.sync(station);
         }
         return result;
@@ -165,12 +171,16 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
         return result;
     }
 
+    /**
+     * 布隆过滤器不支持删除，站点删除后触发全量重建以移除陈旧 ID（低频管理端操作）
+     */
     @Override
     public boolean removeById(Serializable id) {
         boolean result = super.removeById(id);
         if (result) {
             stringRedisTemplate.delete(CacheKeys.stationDetail((Long) id));
             stationGeoService.remove(id);
+            stationBloomFilter.rebuild();
         }
         return result;
     }

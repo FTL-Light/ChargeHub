@@ -12,11 +12,6 @@ public final class CacheKeys {
     private CacheKeys() {}
 
     /**
-     * 空值缓存占位符（防止缓存穿透）
-     */
-    public static final String NULL_PLACEHOLDER = "__NULL__";
-
-    /**
      * 充电站详情
      */
     public static String stationDetail(Long id) {
