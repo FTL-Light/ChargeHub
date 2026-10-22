@@ -13,6 +13,8 @@ import com.charging.service.StationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
@@ -51,6 +53,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     private final StationBloomFilter stationBloomFilter;
     private final ChargerMapper chargerMapper;
     private final ObjectMapper objectMapper;
+    private final RedissonClient redissonClient;
 
     @Override
     public List<Station> findNearbyStations(Double longitude, Double latitude, Double radiusKm) {
@@ -123,8 +126,14 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     }
 
     /**
-     * 站点详情查询链路：布隆过滤器前置拦截 → Redis 缓存 → 数据库（读时回填）
-     * 布隆过滤器判定 ID 一定不存在时直接返回，恶意请求不再穿透到缓存/DB。
+     * 站点详情查询链路：布隆过滤器前置拦截 → Redis 缓存 → 互斥重建 → 数据库
+     *
+     * <p>三级缓存问题在此闭环：
+     * <ul>
+     *   <li>穿透：布隆过滤器拦截不存在的 ID</li>
+     *   <li>雪崩：TTL 加 0~5 分钟随机抖动，避免同批 key 同时失效</li>
+     *   <li>击穿：热点 key 失效瞬间只允许一个线程回源，其余线程短暂等待后双检命中新缓存</li>
+     * </ul>
      */
     @Override
     public Station getCachedById(Long id) {
@@ -133,21 +142,75 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
         }
 
         String key = CacheKeys.stationDetail(id);
-        try {
-            String cached = stringRedisTemplate.opsForValue().get(key);
-            if (cached != null) {
-                return objectMapper.readValue(cached, Station.class);
-            }
-        } catch (Exception e) {
-            log.warn("Redis 站点详情缓存读取失败, key={}, 降级直查数据库", key, e);
+        Station cached = readCache(key);
+        if (cached != null) {
+            return cached;
         }
 
-        Station station = super.getById(id);
+        RLock lock = null;
+        boolean locked = false;
         try {
-            if (station != null) {
-                long expire = 30 * 60L + (long) (Math.random() * 5 * 60);
-                stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(station), expire, TimeUnit.SECONDS);
+            lock = redissonClient.getLock(CacheKeys.stationDetailLock(id));
+            // 最多等待 500ms：等待期间持锁线程通常已重建完成，随后双检即可命中
+            locked = lock.tryLock(500, 10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return loadFromDb(id, key);
+        } catch (Exception e) {
+            // Redis 不可用时不阻断读请求，直接回源
+            log.warn("缓存重建锁不可用, 降级直查数据库, key={}", key, e);
+            return loadFromDb(id, key);
+        }
+
+        try {
+            if (locked) {
+                // 双检：等锁期间缓存可能已被其它线程重建
+                Station rebuilt = readCache(key);
+                if (rebuilt != null) {
+                    return rebuilt;
+                }
             }
+            return loadFromDb(id, key);
+        } finally {
+            if (locked) {
+                try {
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock();
+                    }
+                } catch (Exception e) {
+                    log.warn("缓存重建锁释放失败, key={}", key, e);
+                }
+            }
+        }
+    }
+
+    /**
+     * 读缓存，任何异常都按未命中处理（缓存故障不能影响主流程）
+     */
+    private Station readCache(String key) {
+        try {
+            String cached = stringRedisTemplate.opsForValue().get(key);
+            if (cached == null) {
+                return null;
+            }
+            return objectMapper.readValue(cached, Station.class);
+        } catch (Exception e) {
+            log.warn("Redis 站点详情缓存读取失败, key={}, 降级直查数据库", key, e);
+            return null;
+        }
+    }
+
+    /**
+     * 回源数据库并回填缓存(带随机 TTL)
+     */
+    private Station loadFromDb(Long id, String key) {
+        Station station = super.getById(id);
+        if (station == null) {
+            return null;
+        }
+        try {
+            long expire = 30 * 60L + (long) (Math.random() * 5 * 60);
+            stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(station), expire, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.warn("Redis 站点详情缓存写入失败, key={}", key, e);
         }

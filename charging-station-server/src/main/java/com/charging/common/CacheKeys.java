@@ -19,6 +19,13 @@ public final class CacheKeys {
     }
 
     /**
+     * 充电站详情缓存重建锁(防击穿)：热点 key 失效瞬间只允许一个线程回源
+     */
+    public static String stationDetailLock(Long id) {
+        return "lock:cache:station:" + id;
+    }
+
+    /**
      * 公告列表
      */
     public static String noticeList(int current) {

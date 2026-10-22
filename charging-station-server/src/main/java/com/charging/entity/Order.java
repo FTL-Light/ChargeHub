@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -66,8 +67,15 @@ public class Order {
 
     /**
      * 状态: 0-已取消, 1-充电中, 2-待支付, 3-已完成
+     * 状态流转必须经过 {@link com.charging.common.enums.OrderStatus#transit} 校验
      */
     private Integer status;
+
+    /**
+     * 乐观锁版本号：结算等更新操作携带版本号，防止并发覆盖
+     */
+    @Version
+    private Integer version;
 
     @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT)
     private LocalDateTime createTime;

@@ -137,6 +137,7 @@ CREATE TABLE `t_order` (
   `pay_amount` decimal(10,2) DEFAULT NULL COMMENT '实付金额',
   `pay_type` int DEFAULT NULL COMMENT '支付方式: 1-余额, 2-微信',
   `status` int DEFAULT '1' COMMENT '状态: 0-已取消, 1-充电中, 2-待支付, 3-已完成',
+  `version` int DEFAULT '0' COMMENT '乐观锁版本号',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` int DEFAULT '0' COMMENT '逻辑删除: 0-未删除, 1-已删除',

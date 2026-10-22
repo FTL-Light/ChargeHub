@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -57,8 +58,10 @@ public class NoticeServiceImpl extends ServiceImpl<NoticeMapper, Notice> impleme
 
         if (cacheable) {
             try {
+                // TTL 加 0~60 秒随机抖动，避免同批 key 同时过期形成缓存雪崩
+                long expireSeconds = CACHE_MINUTES * 60 + ThreadLocalRandom.current().nextInt(60);
                 stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(result),
-                        CACHE_MINUTES, TimeUnit.MINUTES);
+                        expireSeconds, TimeUnit.SECONDS);
             } catch (Exception e) {
                 log.warn("Redis 公告列表缓存写入失败, key={}", key, e);
             }
