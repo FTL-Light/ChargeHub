@@ -21,10 +21,10 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.status" placeholder="全部状态" clearable style="width: 130px">
-            <el-option label="充电中" value="0" />
-            <el-option label="已完成" value="1" />
-            <el-option label="已取消" value="2" />
-            <el-option label="异常" value="3" />
+            <el-option label="充电中" :value="1" />
+            <el-option label="待支付" :value="2" />
+            <el-option label="已完成" :value="3" />
+            <el-option label="已取消" :value="0" />
           </el-select>
         </el-form-item>
         <el-form-item label="站点">
@@ -66,19 +66,27 @@
     <div class="table-container">
       <el-table v-loading="loading" :data="tableData" border stripe>
         <el-table-column prop="orderNo" label="订单编号" width="180" show-overflow-tooltip />
-        <el-table-column prop="username" label="用户" width="120" show-overflow-tooltip />
-        <el-table-column prop="stationName" label="站点" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="chargerName" label="充电桩" width="130" show-overflow-tooltip />
+        <el-table-column label="用户ID" width="90" align="center">
+          <template #default="{ row }">{{ row.userId }}</template>
+        </el-table-column>
+        <el-table-column label="站点" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ stationNameOf(row.stationId) }}</template>
+        </el-table-column>
+        <el-table-column label="充电桩" width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ chargerNameOf(row.chargerId) }}</template>
+        </el-table-column>
         <el-table-column label="开始时间" width="170">
           <template #default="{ row }">{{ formatTime(row.startTime) }}</template>
         </el-table-column>
         <el-table-column label="时长" width="100" align="center">
           <template #default="{ row }">{{ formatDuration(row.duration) }}</template>
         </el-table-column>
-        <el-table-column prop="quantity" label="充电量(度)" width="110" align="right" />
+        <el-table-column label="充电量(度)" width="110" align="right">
+          <template #default="{ row }">{{ row.electricity != null ? row.electricity : '-' }}</template>
+        </el-table-column>
         <el-table-column label="金额(元)" width="110" align="right">
           <template #default="{ row }">
-            {{ row.amount != null ? (row.amount / 100).toFixed(2) : '0.00' }}
+            {{ row.payAmount != null ? Number(row.payAmount).toFixed(2) : '0.00' }}
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
@@ -109,16 +117,17 @@
     <el-dialog v-model="detailVisible" title="订单详情" width="640px">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="订单编号" :span="2">{{ detail.orderNo }}</el-descriptions-item>
-        <el-descriptions-item label="用户">{{ detail.username }}</el-descriptions-item>
-        <el-descriptions-item label="手机号">{{ detail.phone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="站点">{{ detail.stationName }}</el-descriptions-item>
-        <el-descriptions-item label="充电桩">{{ detail.chargerName }}</el-descriptions-item>
+        <el-descriptions-item label="用户ID">{{ detail.userId }}</el-descriptions-item>
+        <el-descriptions-item label="支付方式">{{ detail.payType === 2 ? '微信支付' : '余额支付' }}</el-descriptions-item>
+        <el-descriptions-item label="站点">{{ stationNameOf(detail.stationId) }}</el-descriptions-item>
+        <el-descriptions-item label="充电桩">{{ chargerNameOf(detail.chargerId) }}</el-descriptions-item>
+        <el-descriptions-item label="充电枪ID">{{ detail.gunId || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="单价(元/度)">{{ detail.price != null ? detail.price : '-' }}</el-descriptions-item>
         <el-descriptions-item label="开始时间">{{ formatTime(detail.startTime) }}</el-descriptions-item>
         <el-descriptions-item label="结束时间">{{ formatTime(detail.endTime) }}</el-descriptions-item>
         <el-descriptions-item label="时长">{{ formatDuration(detail.duration) }}</el-descriptions-item>
-        <el-descriptions-item label="充电量(度)">{{ detail.quantity }}</el-descriptions-item>
-        <el-descriptions-item label="金额(元)">{{ detail.amount != null ? (detail.amount / 100).toFixed(2) : '0.00' }}</el-descriptions-item>
-        <el-descriptions-item label="支付方式">{{ detail.payType || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="充电量(度)">{{ detail.electricity != null ? detail.electricity : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="金额(元)">{{ detail.payAmount != null ? Number(detail.payAmount).toFixed(2) : '0.00' }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="statusTagType(detail.status)">{{ statusText(detail.status) }}</el-tag>
         </el-descriptions-item>
@@ -130,14 +139,16 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, View } from '@element-plus/icons-vue'
-import { getOrderList, getOrderDetail } from '@/api/order'
+import { getOrderList } from '@/api/order'
 import { getAllStations } from '@/api/station'
+import { getChargerList } from '@/api/charger'
 import { formatTime, formatDuration } from '@/utils/format'
 
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const stationOptions = ref([])
+const chargerOptions = ref([])
 const dateRange = ref([])
 
 const queryParams = reactive({
@@ -151,14 +162,26 @@ const queryParams = reactive({
   endTime: ''
 })
 
+// 订单状态与后端 Order.status 一致: 0-已取消, 1-充电中, 2-待支付, 3-已完成
 const statusText = (status) => {
-  const map = { 0: '充电中', 1: '已完成', 2: '已取消', 3: '异常' }
+  const map = { 0: '已取消', 1: '充电中', 2: '待支付', 3: '已完成' }
   return map[status] ?? '未知'
 }
 
 const statusTagType = (status) => {
-  const map = { 0: 'primary', 1: 'success', 2: 'info', 3: 'danger' }
+  const map = { 0: 'info', 1: 'primary', 2: 'warning', 3: 'success' }
   return map[status] ?? 'info'
+}
+
+// 后端返回的是 ID，列表展示需要名称，用已加载的选项做映射
+const stationNameOf = (stationId) => {
+  const station = stationOptions.value.find((item) => item.id === stationId)
+  return station ? station.name : '-'
+}
+
+const chargerNameOf = (chargerId) => {
+  const charger = chargerOptions.value.find((item) => item.id === chargerId)
+  return charger ? (charger.name || charger.code) : '-'
 }
 
 const handleDateChange = (val) => {
@@ -177,6 +200,15 @@ const fetchStations = async () => {
     stationOptions.value = res.data || []
   } catch (e) {
     stationOptions.value = []
+  }
+}
+
+const fetchChargers = async () => {
+  try {
+    const res = await getChargerList({ current: 1, size: 500 })
+    chargerOptions.value = res.data.records || []
+  } catch (e) {
+    chargerOptions.value = []
   }
 }
 
@@ -215,18 +247,14 @@ const handleReset = () => {
 const detailVisible = ref(false)
 const detail = ref({})
 
-const handleDetail = async (row) => {
-  try {
-    const res = await getOrderDetail(row.id)
-    detail.value = res.data || row
-  } catch (e) {
-    detail.value = row
-  }
+const handleDetail = (row) => {
+  detail.value = row
   detailVisible.value = true
 }
 
 onMounted(() => {
   fetchStations()
+  fetchChargers()
   fetchData()
 })
 </script>

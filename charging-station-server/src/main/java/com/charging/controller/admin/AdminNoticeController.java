@@ -2,6 +2,7 @@ package com.charging.controller.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.entity.Notice;
@@ -30,18 +31,19 @@ public class AdminNoticeController {
     @GetMapping("/list")
     @Operation(summary = "分页查询公告列表")
     public R<Page<Notice>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "标题") @RequestParam(required = false) String title,
             @Parameter(description = "类型") @RequestParam(required = false) Integer type,
             @Parameter(description = "状态") @RequestParam(required = false) Integer status) {
-        Page<Notice> page = new Page<>(current, size);
+        Page<Notice> pageResult = PageUtil.of(current, page, size);
         LambdaQueryWrapper<Notice> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(title != null && !title.isEmpty(), Notice::getTitle, title);
         wrapper.eq(type != null, Notice::getType, type);
         wrapper.eq(status != null, Notice::getStatus, status);
         wrapper.orderByDesc(Notice::getTop).orderByDesc(Notice::getPublishTime);
-        return R.ok(noticeService.page(page, wrapper));
+        return R.ok(noticeService.page(pageResult, wrapper));
     }
 
     @PostMapping

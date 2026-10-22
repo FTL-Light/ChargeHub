@@ -2,6 +2,7 @@ package com.charging.controller.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.entity.Station;
@@ -28,18 +29,19 @@ public class AdminStationController {
     @GetMapping("/list")
     @Operation(summary = "分页查询充电站列表")
     public R<Page<Station>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "站点名称") @RequestParam(required = false) String name,
             @Parameter(description = "城市") @RequestParam(required = false) String city,
             @Parameter(description = "状态") @RequestParam(required = false) Integer status) {
-        Page<Station> page = new Page<>(current, size);
+        Page<Station> pageResult = PageUtil.of(current, page, size);
         LambdaQueryWrapper<Station> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(name != null && !name.isEmpty(), Station::getName, name);
         wrapper.eq(city != null && !city.isEmpty(), Station::getCity, city);
         wrapper.eq(status != null, Station::getStatus, status);
         wrapper.orderByDesc(Station::getCreateTime);
-        return R.ok(stationService.page(page, wrapper));
+        return R.ok(stationService.page(pageResult, wrapper));
     }
 
     @PostMapping

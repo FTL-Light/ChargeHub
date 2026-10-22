@@ -2,6 +2,7 @@ package com.charging.controller.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.result.R;
 import com.charging.entity.User;
 import com.charging.service.UserService;
@@ -27,18 +28,19 @@ public class AdminUserController {
     @GetMapping("/list")
     @Operation(summary = "分页查询用户列表")
     public R<Page<User>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "用户名") @RequestParam(required = false) String username,
             @Parameter(description = "手机号") @RequestParam(required = false) String phone,
             @Parameter(description = "状态") @RequestParam(required = false) Integer status) {
-        Page<User> page = new Page<>(current, size);
+        Page<User> pageResult = PageUtil.of(current, page, size);
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(username != null && !username.isEmpty(), User::getUsername, username);
         wrapper.like(phone != null && !phone.isEmpty(), User::getPhone, phone);
         wrapper.eq(status != null, User::getStatus, status);
         wrapper.orderByDesc(User::getCreateTime);
-        Page<User> result = userService.page(page, wrapper);
+        Page<User> result = userService.page(pageResult, wrapper);
         // 清除密码
         result.getRecords().forEach(u -> u.setPassword(null));
         return R.ok(result);

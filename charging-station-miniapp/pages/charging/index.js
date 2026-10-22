@@ -8,7 +8,11 @@ const {
 Page({
   data: {
     chargerId: null,
+    stationId: null,
+    gunId: null,
+    gunCode: '',
     chargerInfo: {},
+    guns: [],
     isCharging: false,
     chargingTime: 0,
     chargingTimeText: '00:00',
@@ -40,22 +44,26 @@ Page({
   },
 
   // 加载充电桩信息
+  // 后端 /miniapp/charger/{id} 返回 { charger, guns }，此处解包并自动选中一把空闲枪
   loadChargerInfo(id) {
     this.setData({ loading: true })
     getChargerDetail(id)
       .then((res) => {
-        const info = res || {}
+        const charger = (res && res.charger) || {}
+        const guns = (res && res.guns) || []
+        // 优先选空闲枪(status=1)，没有空闲枪则取第一把用于展示
+        const idleGun = guns.find((g) => g.status === 1) || guns[0] || null
         this.setData({
-          chargerInfo: info,
+          chargerInfo: charger,
+          stationId: charger.stationId || null,
+          guns,
+          gunId: idleGun ? idleGun.id : null,
+          gunCode: idleGun ? idleGun.code : '',
           loading: false
         })
-        // 检查是否已在充电
-        if (info.orderId && (info.status === 1 || info.status === '使用中' || info.status === '充电中')) {
-          this.setData({
-            isCharging: true,
-            orderId: info.orderId
-          })
-          this.startTimer()
+        // 桩状态 2 = 使用中，说明当前正在充电，拉取进行中的订单
+        if (charger.status === 2) {
+          this.syncChargingOrder()
         }
       })
       .catch(() => {
@@ -63,17 +71,44 @@ Page({
       })
   },
 
+  // 拉取当前进行中的订单(用户可能在其他入口发起了充电)
+  syncChargingOrder() {
+    getChargingStatus({})
+      .then((res) => {
+        if (res && res.id) {
+          this.setData({
+            isCharging: true,
+            orderId: res.id,
+            stationId: res.stationId || this.data.stationId,
+            gunId: res.gunId || this.data.gunId,
+            chargingTime: res.duration != null ? res.duration * 60 : 0
+          })
+          this.startTimer()
+        }
+      })
+      .catch(() => {})
+  },
+
   // 开始充电
   startCharging() {
     if (this.data.starting) return
     const charger = this.data.chargerInfo
-    if (charger.status !== 0 && charger.status !== '空闲') {
+    // 桩状态: 0-故障, 1-空闲, 2-使用中
+    if (charger.status !== 1) {
       wx.showToast({ title: '该充电桩当前不可用', icon: 'none' })
+      return
+    }
+    if (!this.data.gunId) {
+      wx.showToast({ title: '该充电桩暂无空闲充电枪', icon: 'none' })
       return
     }
     this.setData({ starting: true })
     wx.showLoading({ title: '正在启动充电' })
-    startCharging({ chargerId: this.data.chargerId })
+    startCharging({
+      chargerId: this.data.chargerId,
+      stationId: this.data.stationId,
+      gunId: this.data.gunId
+    })
       .then((res) => {
         wx.hideLoading()
         const orderId = (res && res.orderId) || (res && res.id) || res
@@ -85,6 +120,8 @@ Page({
           amount: 0,
           starting: false
         })
+        // 后端返回的订单里带最新桩状态，同步一次避免本地状态过期
+        this.setData({ 'chargerInfo.status': 2 })
         wx.showToast({ title: '充电已开始', icon: 'success' })
         this.startTimer()
       })
@@ -104,7 +141,7 @@ Page({
         if (res.confirm) {
           this.setData({ stopping: true })
           wx.showLoading({ title: '正在停止充电' })
-          stopCharging({ orderId: this.data.orderId, chargerId: this.data.chargerId })
+          stopCharging({ orderId: this.data.orderId })
             .then((res) => {
               wx.hideLoading()
               this.clearTimer()
@@ -115,7 +152,8 @@ Page({
                 stopping: false,
                 chargingTime: 0,
                 electricity: 0,
-                amount: 0
+                amount: 0,
+                'chargerInfo.status': 1
               })
               setTimeout(() => {
                 wx.redirectTo({
@@ -167,17 +205,19 @@ Page({
     }
   },
 
-  // 更新充电信息（实时拉取）
+  // 轮询订单状态
+  // 后端当前未提供实时计量，电量/金额由本地按"功率 × 时长"估算；
+  // 这里只负责探测订单是否已被结束(服务端超时结算 / 其他端停止)。
   updateChargingInfo() {
-    getChargingStatus({ orderId: this.data.orderId })
+    getChargingStatus({})
       .then((res) => {
-        if (res) {
+        if (!res || res.status !== 1) {
+          this.clearTimer()
           this.setData({
-            electricity: res.electricity != null ? res.electricity : this.data.electricity,
-            amount: res.amount != null ? res.amount : this.data.amount,
-            chargingTime: res.duration != null ? res.duration : this.data.chargingTime,
-            chargingTimeText: this.formatTime(res.duration != null ? res.duration : this.data.chargingTime)
+            isCharging: false,
+            'chargerInfo.status': 1
           })
+          wx.showToast({ title: '充电已结束', icon: 'none' })
         }
       })
       .catch(() => {})

@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.charging.common.CacheKeys;
 import com.charging.config.StationBloomFilter;
+import com.charging.entity.Charger;
 import com.charging.entity.Station;
+import com.charging.mapper.ChargerMapper;
 import com.charging.mapper.StationMapper;
 import com.charging.service.StationGeoService;
 import com.charging.service.StationService;
@@ -47,6 +49,7 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
     private final StringRedisTemplate stringRedisTemplate;
     private final StationGeoService stationGeoService;
     private final StationBloomFilter stationBloomFilter;
+    private final ChargerMapper chargerMapper;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -183,6 +186,27 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
             stationBloomFilter.rebuild();
         }
         return result;
+    }
+
+    /**
+     * 重算并回写站点充电桩数量(t_station.charger_count 为冗余字段，
+     * 充电桩增删后调用，避免后台列表长期显示 0)
+     */
+    @Override
+    public void refreshChargerCount(Long stationId) {
+        if (stationId == null) {
+            return;
+        }
+        try {
+            Long count = chargerMapper.selectCount(
+                    new LambdaQueryWrapper<Charger>().eq(Charger::getStationId, stationId));
+            Station update = new Station();
+            update.setId(stationId);
+            update.setChargerCount(count == null ? 0 : count.intValue());
+            this.updateById(update);
+        } catch (Exception e) {
+            log.warn("站点充电桩数量刷新失败, stationId={}", stationId, e);
+        }
     }
 
     /**

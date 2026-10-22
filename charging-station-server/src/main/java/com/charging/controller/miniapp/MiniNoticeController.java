@@ -2,6 +2,7 @@ package com.charging.controller.miniapp;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.entity.Notice;
@@ -28,10 +29,12 @@ public class MiniNoticeController {
     @GetMapping("/list")
     @Operation(summary = "分页查询公告列表")
     public R<Page<Notice>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "类型") @RequestParam(required = false) Integer type) {
-        return R.ok(noticeService.pageCached(current, size, type));
+        Page<Notice> pageResult = PageUtil.of(current, page, size);
+        return R.ok(noticeService.pageCached((int) pageResult.getCurrent(), (int) pageResult.getSize(), type));
     }
 
     @GetMapping("/{id}")

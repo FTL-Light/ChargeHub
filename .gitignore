@@ -47,5 +47,10 @@ project.private.config.json
 开发指导书.pdf
 面试准备文档.md
 充电站项目面试题.md
+面试八股文.md
+代码审查报告.md
 开发流程.txt
 Java后端-全栈-技术栈学习路线.md
+
+# ---------- 本地工具产物 ----------
+.workbuddy/

@@ -27,4 +27,11 @@ public interface StationService extends IService<Station> {
      * @return 站点详情；不存在返回 null
      */
     Station getCachedById(Long id);
+
+    /**
+     * 重算并回写站点下的充电桩数量(t_station.charger_count 为冗余字段)
+     *
+     * @param stationId 站点ID
+     */
+    void refreshChargerCount(Long stationId);
 }

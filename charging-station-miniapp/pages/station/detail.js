@@ -40,10 +40,10 @@ Page({
   // 点击充电桩
   onChargerTap(e) {
     const charger = e.currentTarget.dataset.charger
-    const status = charger.status
-    // 状态：0 空闲, 1 使用中, 2 故障, 3 离线
-    if (status !== 0 && status !== '空闲') {
-      wx.showToast({ title: '该充电桩当前不可用', icon: 'none' })
+    // 与后端一致: 0-故障, 1-空闲, 2-使用中
+    if (charger.status !== 1) {
+      const tip = charger.status === 2 ? '该充电桩使用中' : '该充电桩当前不可用'
+      wx.showToast({ title: tip, icon: 'none' })
       return
     }
     wx.navigateTo({

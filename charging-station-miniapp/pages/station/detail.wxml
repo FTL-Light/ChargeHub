@@ -38,7 +38,7 @@
           <view class="charger-icon">⚡</view>
           <view class="charger-info">
             <view class="charger-no">编号：{{item.code || item.chargerNo || item.id}}</view>
-            <view class="charger-type">{{item.type || item.chargerType || '未知类型'}}</view>
+            <view class="charger-type">{{item.type === 1 ? '慢充' : (item.type === 2 ? '快充' : '未知类型')}}</view>
             <view class="charger-meta">
               <text class="meta-power">{{item.power || item.powerRate || '-'}}kW</text>
               <text class="meta-price">¥{{item.price || item.unitPrice || '0.00'}}/度</text>
@@ -46,11 +46,12 @@
           </view>
         </view>
         <view class="charger-right">
+          <!-- 与后端/数据库保持一致: 0-故障, 1-空闲, 2-使用中 -->
           <view class="charger-status status-{{item.status}}">
-            {{item.status === 0 || item.status === '空闲' ? '空闲' : item.status === 1 || item.status === '使用中' ? '使用中' : item.status === 2 || item.status === '故障' ? '故障' : '离线'}}
+            {{item.status === 0 ? '故障' : (item.status === 1 ? '空闲' : (item.status === 2 ? '使用中' : '未知'))}}
           </view>
           <view
-            class="charge-btn {{(item.status === 0 || item.status === '空闲') ? '' : 'disabled'}}"
+            class="charge-btn {{item.status === 1 ? '' : 'disabled'}}"
             catchtap="onChargerTap"
             data-charger="{{item}}"
           >

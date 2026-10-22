@@ -13,3 +13,6 @@ jwt:
   secret: 你的JWT密钥（至少256位）
 ai:
   api-key: 你的DeepSeek API Key
+# 模拟支付开关：本地/演示环境保持 true；生产环境必须改为 false 并接入真实支付网关
+pay:
+  mock-enabled: true

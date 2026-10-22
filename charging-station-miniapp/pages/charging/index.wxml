@@ -11,21 +11,26 @@
     <view class="charger-attrs">
       <view class="attr-item">
         <text class="attr-label">类型</text>
-        <text class="attr-value">{{chargerInfo.type || chargerInfo.chargerType || '未知'}}</text>
+        <text class="attr-value">{{chargerInfo.type === 1 ? '慢充' : (chargerInfo.type === 2 ? '快充' : '未知')}}</text>
       </view>
       <view class="attr-item">
         <text class="attr-label">功率</text>
-        <text class="attr-value">{{chargerInfo.power || chargerInfo.powerRate || '-'}}kW</text>
+        <text class="attr-value">{{chargerInfo.power || '-'}}kW</text>
       </view>
       <view class="attr-item">
         <text class="attr-label">单价</text>
-        <text class="attr-value price">¥{{chargerInfo.price || chargerInfo.unitPrice || '0.00'}}/度</text>
+        <text class="attr-value price">¥{{chargerInfo.price || '0.00'}}/度</text>
       </view>
       <view class="attr-item">
         <text class="attr-label">状态</text>
+        <!-- 与后端/数据库保持一致: 0-故障, 1-空闲, 2-使用中 -->
         <text class="attr-value status-{{chargerInfo.status}}">
-          {{chargerInfo.status === 0 || chargerInfo.status === '空闲' ? '空闲' : chargerInfo.status === 1 || chargerInfo.status === '使用中' ? '使用中' : chargerInfo.status === 2 || chargerInfo.status === '故障' ? '故障' : '离线'}}
+          {{chargerInfo.status === 0 ? '故障' : (chargerInfo.status === 1 ? '空闲' : (chargerInfo.status === 2 ? '使用中' : '未知'))}}
         </text>
+      </view>
+      <view class="attr-item" wx:if="{{gunCode}}">
+        <text class="attr-label">充电枪</text>
+        <text class="attr-value">{{gunCode}}</text>
       </view>
     </view>
   </view>
@@ -64,7 +69,7 @@
     <view class="idle-text">设备就绪</view>
     <view class="idle-desc">请确认充电桩状态为空闲后开始充电</view>
     <view
-      class="start-btn {{(chargerInfo.status === 0 || chargerInfo.status === '空闲') ? '' : 'disabled'}}"
+      class="start-btn {{chargerInfo.status === 1 ? '' : 'disabled'}}"
       bindtap="startCharging"
     >
       <text>开始充电</text>

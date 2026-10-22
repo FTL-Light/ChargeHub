@@ -2,6 +2,7 @@ package com.charging.controller.miniapp;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.entity.RechargeRecord;
@@ -11,7 +12,10 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,15 +53,16 @@ public class MiniRechargeController {
     @GetMapping("/list")
     @Operation(summary = "充值记录列表")
     public R<Page<RechargeRecord>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        Page<RechargeRecord> page = new Page<>(current, size);
+        Page<RechargeRecord> pageResult = PageUtil.of(current, page, size);
         LambdaQueryWrapper<RechargeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(RechargeRecord::getUserId, userId);
         wrapper.orderByDesc(RechargeRecord::getCreateTime);
-        return R.ok(rechargeRecordService.page(page, wrapper));
+        return R.ok(rechargeRecordService.page(pageResult, wrapper));
     }
 
     /**
@@ -66,13 +71,16 @@ public class MiniRechargeController {
     @Data
     public static class RechargeDTO {
         @NotNull(message = "充值金额不能为空")
+        @DecimalMin(value = "0.01", message = "充值金额必须大于0")
         private BigDecimal amount;
 
         private Integer payType;
 
         /**
-         * 幂等请求号(前端生成，同一请求号只充值一次)
+         * 幂等请求号(前端生成，同一请求号只充值一次)，必填
          */
+        @NotBlank(message = "请求号不能为空")
+        @Size(max = 64, message = "请求号长度不能超过64")
         private String requestNo;
     }
 }

@@ -57,11 +57,14 @@
         <el-table-column type="index" label="#" width="55" align="center" />
         <el-table-column prop="code" label="编号" width="140" />
         <el-table-column prop="name" label="名称" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="stationName" label="所属站点" min-width="160" show-overflow-tooltip />
-        <el-table-column label="类型" width="100" align="center">
+        <el-table-column label="所属站点" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">{{ stationNameOf(row.stationId) }}</template>
+        </el-table-column>
+        <el-table-column label="类型" width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.type === 1 ? 'danger' : 'warning'">
-              {{ row.type === 1 ? '直流快充' : '交流慢充' }}
+            <!-- 与后端/数据库保持一致: 1-交流慢充, 2-直流快充 -->
+            <el-tag :type="row.type === 2 ? 'danger' : 'warning'">
+              {{ row.type === 1 ? '交流慢充' : (row.type === 2 ? '直流快充' : '未知') }}
             </el-tag>
           </template>
         </el-table-column>
@@ -125,8 +128,8 @@
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-radio-group v-model="form.type">
-            <el-radio :value="1">直流快充</el-radio>
-            <el-radio :value="2">交流慢充</el-radio>
+            <el-radio :value="1">交流慢充</el-radio>
+            <el-radio :value="2">直流快充</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="功率(kW)" prop="power">
@@ -139,11 +142,11 @@
           <el-input-number v-model="form.price" :min="0" :precision="2" style="width: 100%" />
         </el-form-item>
         <el-form-item label="状态" prop="status">
+          <!-- 与后端/数据库保持一致: 0-故障, 1-空闲, 2-使用中 -->
           <el-select v-model="form.status" style="width: 100%">
-            <el-option label="空闲" :value="0" />
-            <el-option label="使用中" :value="1" />
-            <el-option label="故障" :value="2" />
-            <el-option label="离线" :value="3" />
+            <el-option label="故障" :value="0" />
+            <el-option label="空闲" :value="1" />
+            <el-option label="使用中" :value="2" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -179,14 +182,21 @@ const queryParams = reactive({
   status: ''
 })
 
+// 状态: 0-故障, 1-空闲, 2-使用中（与后端 t_charger.status 一致）
 const statusText = (status) => {
-  const map = { 0: '空闲', 1: '使用中', 2: '故障', 3: '离线' }
+  const map = { 0: '故障', 1: '空闲', 2: '使用中' }
   return map[status] ?? '未知'
 }
 
 const statusTagType = (status) => {
-  const map = { 0: 'success', 1: 'primary', 2: 'danger', 3: 'info' }
+  const map = { 0: 'danger', 1: 'success', 2: 'primary' }
   return map[status] ?? 'info'
+}
+
+// 后端 Charger 只返回 stationId，站点名由下拉选项映射，避免列表出现空列
+const stationNameOf = (stationId) => {
+  const station = stationOptions.value.find((item) => item.id === stationId)
+  return station ? station.name : '-'
 }
 
 const fetchStations = async () => {
@@ -241,7 +251,7 @@ const form = reactive({
   power: 60,
   gunCount: 2,
   price: 1.5,
-  status: 0
+  status: 1
 })
 
 const formRules = {
@@ -263,7 +273,7 @@ const resetForm = () => {
     power: 60,
     gunCount: 2,
     price: 1.5,
-    status: 0
+    status: 1
   })
   formRef.value?.clearValidate()
 }

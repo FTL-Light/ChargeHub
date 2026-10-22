@@ -2,6 +2,7 @@ package com.charging.controller.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.result.R;
 import com.charging.entity.Order;
 import com.charging.entity.User;
@@ -36,7 +37,8 @@ public class AdminOrderController {
     @GetMapping("/list")
     @Operation(summary = "分页查询订单列表")
     public R<Page<Order>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "订单号") @RequestParam(required = false) String orderNo,
             @Parameter(description = "手机号") @RequestParam(required = false) String phone,
@@ -44,7 +46,7 @@ public class AdminOrderController {
             @Parameter(description = "站点ID") @RequestParam(required = false) Long stationId,
             @Parameter(description = "开始时间") @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @Parameter(description = "结束时间") @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
-        Page<Order> page = new Page<>(current, size);
+        Page<Order> pageResult = PageUtil.of(current, page, size);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(orderNo != null && !orderNo.isEmpty(), Order::getOrderNo, orderNo);
         wrapper.eq(status != null, Order::getStatus, status);
@@ -58,14 +60,14 @@ public class AdminOrderController {
                     .like(User::getPhone, phone)
                     .list();
             if (users.isEmpty()) {
-                return R.ok(page);
+                return R.ok(pageResult);
             }
             List<Long> userIds = users.stream().map(User::getId).collect(Collectors.toList());
             wrapper.in(Order::getUserId, userIds);
         }
 
         wrapper.orderByDesc(Order::getCreateTime);
-        return R.ok(orderService.page(page, wrapper));
+        return R.ok(orderService.page(pageResult, wrapper));
     }
 
     @GetMapping("/statistics")

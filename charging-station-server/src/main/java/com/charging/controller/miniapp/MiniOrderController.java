@@ -3,6 +3,7 @@ package com.charging.controller.miniapp;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.charging.common.PageUtil;
 import com.charging.common.exception.BusinessException;
 import com.charging.common.result.R;
 import com.charging.dto.StartChargingDTO;
@@ -71,16 +72,32 @@ public class MiniOrderController {
             throw new BusinessException("充电桩使用中，请选择其他充电桩");
         }
 
-        // 校验充电枪
-        Gun gun = gunService.getById(dto.getGunId());
-        if (gun == null) {
-            throw new BusinessException("充电枪不存在");
-        }
-        if (gun.getStatus() == null || gun.getStatus() == 0) {
-            throw new BusinessException("充电枪故障，无法使用");
-        }
-        if (gun.getStatus() == 2) {
-            throw new BusinessException("充电枪使用中，请选择其他充电枪");
+        // 校验充电枪：未指定时自动选择该桩下第一把空闲枪(扫码场景只带 chargerId)
+        Gun gun;
+        if (dto.getGunId() != null) {
+            gun = gunService.getById(dto.getGunId());
+            if (gun == null) {
+                throw new BusinessException("充电枪不存在");
+            }
+            if (!charger.getId().equals(gun.getChargerId())) {
+                throw new BusinessException("该充电枪不属于此充电桩");
+            }
+            if (gun.getStatus() == null || gun.getStatus() == 0) {
+                throw new BusinessException("充电枪故障，无法使用");
+            }
+            if (gun.getStatus() == 2) {
+                throw new BusinessException("充电枪使用中，请选择其他充电枪");
+            }
+        } else {
+            gun = gunService.lambdaQuery()
+                    .eq(Gun::getChargerId, charger.getId())
+                    .eq(Gun::getStatus, 1)
+                    .orderByAsc(Gun::getCode)
+                    .last("LIMIT 1")
+                    .one();
+            if (gun == null) {
+                throw new BusinessException("该充电桩暂无空闲充电枪");
+            }
         }
 
         // 检查用户是否已有充电中的订单
@@ -92,17 +109,8 @@ public class MiniOrderController {
             throw new BusinessException("您有正在进行的充电订单，请先结束");
         }
 
-        // CAS 锁定充电枪(仅当仍为空闲时更新成功)，防止并发抢占同一把枪
-        boolean gunLocked = gunService.lambdaUpdate()
-                .eq(Gun::getId, gun.getId())
-                .eq(Gun::getStatus, 1)
-                .set(Gun::getStatus, 2)
-                .update();
-        if (!gunLocked) {
-            throw new BusinessException("充电枪已被占用，请选择其他充电枪");
-        }
-
-        // CAS 锁定充电桩，失败则抛异常回滚(释放上面锁定的枪)
+        // 加锁顺序统一为 充电桩 -> 充电枪，与 stop() 保持一致，避免交叉加锁引发死锁
+        // CAS 锁定充电桩(仅当仍为空闲时更新成功)
         boolean chargerLocked = chargerService.lambdaUpdate()
                 .eq(Charger::getId, charger.getId())
                 .eq(Charger::getStatus, 1)
@@ -112,16 +120,26 @@ public class MiniOrderController {
             throw new BusinessException("充电桩已被占用，请选择其他充电桩");
         }
 
+        // CAS 锁定充电枪，失败则抛异常回滚(释放上面锁定的充电桩)，防止并发抢占同一把枪
+        boolean gunLocked = gunService.lambdaUpdate()
+                .eq(Gun::getId, gun.getId())
+                .eq(Gun::getStatus, 1)
+                .set(Gun::getStatus, 2)
+                .update();
+        if (!gunLocked) {
+            throw new BusinessException("充电枪已被占用，请选择其他充电枪");
+        }
+
         // 生成订单编号: ORD + 时间戳 + 4位随机数
         String orderNo = "ORD" + System.currentTimeMillis() + RandomUtil.randomNumbers(4);
 
-        // 创建订单
+        // 创建订单(站点/桩/枪以服务端查询结果为准，不信任前端传入)
         Order order = new Order();
         order.setOrderNo(orderNo);
         order.setUserId(userId);
-        order.setStationId(dto.getStationId());
-        order.setChargerId(dto.getChargerId());
-        order.setGunId(dto.getGunId());
+        order.setStationId(charger.getStationId());
+        order.setChargerId(charger.getId());
+        order.setGunId(gun.getId());
         order.setStartTime(LocalDateTime.now());
         order.setPrice(charger.getPrice());
         order.setPayType(dto.getPayType() != null ? dto.getPayType() : 1);
@@ -162,15 +180,17 @@ public class MiniOrderController {
         // 获取充电桩信息计算电量
         Charger charger = chargerService.getById(order.getChargerId());
         // 电量(度) = 功率(kW) * 时间(h)
-        BigDecimal electricity = BigDecimal.ZERO;
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        if (charger != null && charger.getPower() != null) {
-            BigDecimal hours = new BigDecimal(minutes).divide(new BigDecimal("60"), 4, RoundingMode.HALF_UP);
-            electricity = charger.getPower().multiply(hours).setScale(2, RoundingMode.HALF_UP);
-            // 总金额 = 电量 * 单价
-            BigDecimal price = order.getPrice() != null ? order.getPrice() : charger.getPrice();
-            totalAmount = electricity.multiply(price).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal electricity;
+        BigDecimal totalAmount;
+        if (charger == null || charger.getPower() == null || charger.getPower().compareTo(BigDecimal.ZERO) <= 0) {
+            // 计费参数缺失时不允许按 0 元结算，否则等于免费充电
+            throw new BusinessException("充电桩计费参数异常，请联系管理员处理");
         }
+        BigDecimal hours = new BigDecimal(minutes).divide(new BigDecimal("60"), 4, RoundingMode.HALF_UP);
+        electricity = charger.getPower().multiply(hours).setScale(2, RoundingMode.HALF_UP);
+        // 总金额 = 电量 * 单价
+        BigDecimal price = order.getPrice() != null ? order.getPrice() : charger.getPrice();
+        totalAmount = electricity.multiply(price).setScale(2, RoundingMode.HALF_UP);
 
         // 更新订单
         order.setEndTime(endTime);
@@ -180,6 +200,10 @@ public class MiniOrderController {
         order.setPayAmount(totalAmount);
 
         Integer payType = dto.getPayType() != null ? dto.getPayType() : order.getPayType();
+        // 微信支付通道未接入：置为"待支付"会产生永远无法结清的订单，先显式拒绝
+        if (payType != null && payType == 2) {
+            throw new BusinessException("暂不支持微信支付，请使用余额支付");
+        }
         order.setPayType(payType);
 
         if (payType != null && payType == 1) {
@@ -190,7 +214,7 @@ public class MiniOrderController {
             }
             order.setStatus(3); // 已完成
         } else {
-            order.setStatus(2); // 待支付
+            order.setStatus(2); // 待支付(微信支付接入后走支付回调置为已完成)
         }
         orderService.updateById(order);
 
@@ -232,17 +256,18 @@ public class MiniOrderController {
     @GetMapping("/list")
     @Operation(summary = "我的订单列表")
     public R<Page<Order>> list(
-            @Parameter(description = "当前页") @RequestParam(defaultValue = "1") Integer current,
+            @Parameter(description = "当前页") @RequestParam(required = false) Integer current,
+            @Parameter(description = "页码(兼容前端 page 参数)") @RequestParam(required = false) Integer page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer size,
             @Parameter(description = "状态") @RequestParam(required = false) Integer status,
             HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        Page<Order> page = new Page<>(current, size);
+        Page<Order> pageResult = PageUtil.of(current, page, size);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Order::getUserId, userId);
         wrapper.eq(status != null, Order::getStatus, status);
         wrapper.orderByDesc(Order::getCreateTime);
-        return R.ok(orderService.page(page, wrapper));
+        return R.ok(orderService.page(pageResult, wrapper));
     }
 
     @GetMapping("/{id}")
