@@ -13,8 +13,6 @@ import com.charging.service.StationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
@@ -48,12 +46,29 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
      */
     private static final double EARTH_RADIUS_KM = 6371.0;
 
+    /**
+     * 缓存重建锁的槽位数（2 的幂，按站点 ID 取模散列）
+     */
+    private static final int REBUILD_LOCK_STRIPES = 64;
+
+    /**
+     * 分段互斥锁：只为"缓存重建"服务，固定槽位避免为每个 key 建锁对象导致无界增长
+     */
+    private static final Object[] REBUILD_LOCKS = createRebuildLocks();
+
+    private static Object[] createRebuildLocks() {
+        Object[] locks = new Object[REBUILD_LOCK_STRIPES];
+        for (int i = 0; i < locks.length; i++) {
+            locks[i] = new Object();
+        }
+        return locks;
+    }
+
     private final StringRedisTemplate stringRedisTemplate;
     private final StationGeoService stationGeoService;
     private final StationBloomFilter stationBloomFilter;
     private final ChargerMapper chargerMapper;
     private final ObjectMapper objectMapper;
-    private final RedissonClient redissonClient;
 
     @Override
     public List<Station> findNearbyStations(Double longitude, Double latitude, Double radiusKm) {
@@ -132,8 +147,11 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
      * <ul>
      *   <li>穿透：布隆过滤器拦截不存在的 ID</li>
      *   <li>雪崩：TTL 加 0~5 分钟随机抖动，避免同批 key 同时失效</li>
-     *   <li>击穿：热点 key 失效瞬间只允许一个线程回源，其余线程短暂等待后双检命中新缓存</li>
+     *   <li>击穿：热点 key 失效瞬间只允许一个线程回源，其余线程等待后双检命中新缓存</li>
      * </ul>
+     *
+     * <p>互斥用的是本地分段锁：单实例部署下与分布式锁效果等价，且不必为一次缓存重建
+     * 额外依赖 Redis。多实例时最坏情况是每个实例各回源一次，结果仍幂等。
      */
     @Override
     public Station getCachedById(Long id) {
@@ -147,41 +165,21 @@ public class StationServiceImpl extends ServiceImpl<StationMapper, Station> impl
             return cached;
         }
 
-        RLock lock = null;
-        boolean locked = false;
-        try {
-            lock = redissonClient.getLock(CacheKeys.stationDetailLock(id));
-            // 最多等待 500ms：等待期间持锁线程通常已重建完成，随后双检即可命中
-            locked = lock.tryLock(500, 10, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return loadFromDb(id, key);
-        } catch (Exception e) {
-            // Redis 不可用时不阻断读请求，直接回源
-            log.warn("缓存重建锁不可用, 降级直查数据库, key={}", key, e);
+        synchronized (rebuildLockOf(id)) {
+            // 双检：等锁期间缓存可能已被其它线程重建
+            Station rebuilt = readCache(key);
+            if (rebuilt != null) {
+                return rebuilt;
+            }
             return loadFromDb(id, key);
         }
+    }
 
-        try {
-            if (locked) {
-                // 双检：等锁期间缓存可能已被其它线程重建
-                Station rebuilt = readCache(key);
-                if (rebuilt != null) {
-                    return rebuilt;
-                }
-            }
-            return loadFromDb(id, key);
-        } finally {
-            if (locked) {
-                try {
-                    if (lock.isHeldByCurrentThread()) {
-                        lock.unlock();
-                    }
-                } catch (Exception e) {
-                    log.warn("缓存重建锁释放失败, key={}", key, e);
-                }
-            }
-        }
+    /**
+     * 按站点 ID 取分段锁：固定 64 个槽位，避免为每个 key 建锁对象导致无界增长
+     */
+    private Object rebuildLockOf(Long id) {
+        return REBUILD_LOCKS[(int) (id & (REBUILD_LOCK_STRIPES - 1))];
     }
 
     /**

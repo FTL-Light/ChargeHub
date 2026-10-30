@@ -3,12 +3,16 @@ package com.charging;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 充电站管理平台启动类
  */
 @SpringBootApplication
 @MapperScan("com.charging.mapper")
+// 订单超时兜底补偿任务依赖定时任务：延迟消息可能因 MQ 宕机、消息丢失而失效，
+// 扫描数据库的兜底任务才是最后一道防线
+@EnableScheduling
 public class ChargingApplication {
 
     public static void main(String[] args) {

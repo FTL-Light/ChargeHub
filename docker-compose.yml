@@ -1,0 +1,43 @@
+# 本地依赖中间件
+# 启动： docker compose up -d
+# 停止： docker compose down
+#
+# 说明：MySQL 本机已有（3306），这里只补齐第 2 周依赖的两个中间件：
+#   - Redis：第 1 周的分布式锁、幂等切面
+#   - RabbitMQ：第 2 周的延迟队列（超时自动结算、待支付关单）
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: charging-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    # management 镜像自带管理后台，方便观察延迟队列堆积情况
+    image: rabbitmq:3.13-management-alpine
+    container_name: charging-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  redis-data:
+  rabbitmq-data:

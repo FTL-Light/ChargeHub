@@ -77,6 +77,12 @@ public class Order {
     @Version
     private Integer version;
 
+    /**
+     * 结算方式: 0-用户主动, 1-超时自动(延迟消息), 2-超时兜底(定时任务)
+     * 见 {@link com.charging.common.enums.OrderSettleType}
+     */
+    private Integer settleType;
+
     @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT)
     private LocalDateTime createTime;
 

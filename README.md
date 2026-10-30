@@ -4,12 +4,15 @@
 
 ## 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 用户端 | 微信原生小程序框架（WXML/WXSS/JS） |
-| 管理端 | Vue3 + Element-Plus + ECharts + 高德地图API |
-| 服务端 | Java17 + SpringBoot 3.x + MyBatis-Plus + Knife4J + DeepSeek AI |
-| 数据库 | MySQL 8.0 |
+**后端**：Spring Boot 3.2 · JDK 17 · MyBatis-Plus 3.5 · MySQL 8.0 · Redis 7（缓存 / GEO 附近站点）· Redisson 3.27（布隆过滤器，防缓存穿透）· RabbitMQ 3.13（TTL + 死信延迟队列）· JWT · BCrypt · Spring AOP（幂等切面）· 定时任务兜底扫描 · Knife4j 4.4（OpenAPI 3）· DeepSeek API（OkHttp）· Hutool
+
+**管理端**：Vue 3 · Vite 5 · Vue Router 4 · Pinia 2 · Element-Plus 2.6 · ECharts 5 · 高德地图 JS API · Axios
+
+**用户端**：微信原生小程序（WXML / WXSS / JS）；`wx.login` / `wx.getLocation` / `wx.scanCode` / `wx.openLocation`
+
+**部署**：Docker Compose（Redis + RabbitMQ）· Nginx · Maven Profile（dev / prod）
+
+> 充值目前为**模拟入账**（`pay.mock-enabled`），微信支付 V3 未接入。
 
 ## 项目结构
 

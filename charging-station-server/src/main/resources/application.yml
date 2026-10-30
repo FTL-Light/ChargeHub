@@ -17,6 +17,30 @@ spring:
       password: ${REDIS_PASSWORD:}
       database: 0
       timeout: 3s
+  rabbitmq:
+    # 延迟队列依赖：充电超时自动结算、待支付订单自动关单
+    host: ${MQ_HOST:localhost}
+    port: ${MQ_PORT:5672}
+    username: ${MQ_USERNAME:guest}
+    password: ${MQ_PASSWORD:guest}
+    virtual-host: ${MQ_VHOST:/}
+    connection-timeout: 3s
+    # 生产者确认：消息未到达交换机/队列时回调 nack，据此重试或转兜底任务
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        # 手动 ACK：业务真正处理成功再确认，防止进程崩溃导致消息丢失
+        acknowledge-mode: manual
+        prefetch: 10
+        # 重试/拒绝的消息不再回灌原队列，交由业务侧重试计数或兜底任务处理
+        default-requeue-rejected: false
+        # 无 RabbitMQ 环境（如本地只起 MySQL/Redis）时可关闭，避免启动噪音
+        auto-startup: ${MQ_LISTENER_ENABLED:true}
+        retry:
+          enabled: false
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -71,3 +95,16 @@ pay:
   amount-options: 10,50,100,200,500
   # 单用户单日累计充值上限(元)
   daily-limit: 2000
+order:
+  # 单次充电最长时长(分钟)。超过该时长用户仍未结束充电，由延迟消息触发自动结算，
+  # 解决"拔枪不点结束"导致的订单永久充电中、枪永久占用（卡单）。
+  max-charging-minutes: ${MAX_CHARGING_MINUTES:720}
+  # 待支付订单保留时长(分钟)。超期自动关单，避免占着状态不动、对账口径混乱。
+  unpaid-timeout-minutes: ${UNPAID_TIMEOUT_MINUTES:15}
+  # 兜底补偿任务：MQ 宕机/消息丢失/进程重启时的最后一道防线，扫描数据库而非依赖消息
+  compensation:
+    enabled: ${COMPENSATION_ENABLED:true}
+    # 扫描间隔(毫秒)
+    fixed-delay-ms: ${COMPENSATION_FIXED_DELAY_MS:60000}
+    # 单次扫描处理条数上限，防止一次拉太多拖垮数据库
+    batch-size: ${COMPENSATION_BATCH_SIZE:200}

@@ -9,6 +9,15 @@ spring:
       host: localhost
       port: 6379
       password: 你的Redis密码（无密码可删除本行）
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    # 本地未起 RabbitMQ 时可关闭消费者自启动，服务仍可正常跑（生产端降级 + 定时任务兜底）
+    listener:
+      simple:
+        auto-startup: false
 jwt:
   secret: 你的JWT密钥（至少256位）
 ai:
