@@ -20,6 +20,7 @@ public class ChargingApplication {
         System.out.println("====================================");
         System.out.println("充电站管理平台后端服务启动成功!");
         System.out.println("接口文档地址: http://localhost:8080/api/doc.html");
+        System.out.println("Github:FTL-Light");
         System.out.println("====================================");
     }
 }
